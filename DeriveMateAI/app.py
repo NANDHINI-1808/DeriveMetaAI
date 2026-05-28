@@ -51,13 +51,59 @@ def login_page():
             st.rerun()
 
 # ================= PDF =================
-def create_pdf(text):
+def create_pdf(question, answer, image_url=None):
+
     pdf = FPDF()
     pdf.add_page()
+
+    # Title
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(200, 10, "DERIVE META AI - REVISION BOOKLET", ln=True, align="C")
+
+    pdf.ln(10)
+
+    # Question
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "QUESTION:", ln=True)
+
     pdf.set_font("Arial", size=11)
-    pdf.multi_cell(0, 8, text)
+    pdf.multi_cell(0, 8, question)
+
+    pdf.ln(5)
+
+    # Answer
+    pdf.set_font("Arial", "B", 12)
+    pdf.cell(200, 10, "ANSWER:", ln=True)
+
+    pdf.set_font("Arial", size=11)
+    pdf.multi_cell(0, 8, answer)
+
+    pdf.ln(5)
+
+    # Image (Diagram)
+    if image_url:
+        pdf.set_font("Arial", "B", 12)
+        pdf.cell(200, 10, "DIAGRAM:", ln=True)
+
+        try:
+            import requests
+            from io import BytesIO
+
+            img_data = requests.get(image_url).content
+            img_path = "diagram.png"
+
+            with open(img_path, "wb") as f:
+                f.write(img_data)
+
+            pdf.image(img_path, x=10, w=180)
+
+        except:
+            pdf.set_font("Arial", size=10)
+            pdf.multi_cell(0, 8, "Diagram could not be loaded")
+
     file_path = "revision.pdf"
     pdf.output(file_path)
+
     return file_path
 
 # ================= 🔥 FIXED CIRCUIT DIAGRAM GENERATOR =================
