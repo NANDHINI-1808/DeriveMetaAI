@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 import os
 from fpdf import FPDF
-from PIL import Image
+import streamlit.components.v1 as components
 
 # 🔐 API KEY
 API_KEY = os.getenv("OPENROUTER_API_KEY")
@@ -21,14 +21,37 @@ for item in reversed(st.session_state.history):
     st.sidebar.write(item["topic"])
     st.sidebar.markdown("---")
 
-# ---------------- MAIN UI ----------------
+# ---------------- TITLE ----------------
 st.title("DERIVE META AI 🚀")
-st.subheader("AI Engineering Exam Assistant")
+st.subheader("AI Engineering Exam Preparation Assistant")
 
-# INPUT
+# ---------------- INPUT ----------------
 topic = st.text_input("Enter Engineering Topic")
 
-# FEATURE
+# 🎤 VOICE INPUT (Chrome Web Speech API)
+st.subheader("🎤 Voice Input")
+
+voice_html = """
+<button onclick="startDictation()">🎤 Speak</button>
+<input id="text" style="width:100%;padding:10px;margin-top:10px;" placeholder="Voice text appears here">
+
+<script>
+function startDictation() {
+    var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+    recognition.lang = 'en-US';
+    recognition.start();
+
+    recognition.onresult = function(event) {
+        document.getElementById('text').value =
+        event.results[0][0].transcript;
+    }
+}
+</script>
+"""
+
+components.html(voice_html, height=150)
+
+# ---------------- FEATURE ----------------
 feature = st.selectbox(
     "Choose Feature",
     [
@@ -36,8 +59,6 @@ feature = st.selectbox(
         "Generate 16 Mark Answer",
         "Generate Viva Questions",
         "Generate Image Idea",
-        "Voice Input",
-        "Upload Image",
         "Download PDF"
     ]
 )
@@ -53,26 +74,7 @@ def create_pdf(text):
     pdf.output(file_path)
     return file_path
 
-
-# ---------------- VOICE INPUT (Browser-safe fallback) ----------------
-if feature == "Voice Input":
-    st.info("Use Chrome voice input (recommended Streamlit Cloud safe)")
-    st.markdown("""
-    👉 Use this instead:
-    - Right click → Voice typing in Chrome
-    - Paste text into topic box
-    """)
-
-# ---------------- IMAGE UPLOAD ----------------
-uploaded_file = None
-if feature == "Upload Image":
-    uploaded_file = st.file_uploader("Upload Image", type=["png", "jpg", "jpeg"])
-    if uploaded_file:
-        image = Image.open(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_column_width=True)
-        topic = "Analyze this image and explain engineering concept"
-
-# ---------------- BUTTON ----------------
+# ---------------- GENERATE ----------------
 if st.button("Generate"):
 
     if not API_KEY:
@@ -83,12 +85,12 @@ if st.button("Generate"):
 
     else:
 
-        # 🎯 PROMPTS
+        # 🎯 PROMPT ENGINE
         if feature == "Explain Topic":
             prompt = f"Explain {topic} in simple engineering language"
 
         elif feature == "Generate 16 Mark Answer":
-            prompt = f"Write detailed 16 mark exam answer with derivation for {topic}"
+            prompt = f"Write detailed 16-mark university answer with derivation for {topic}"
 
         elif feature == "Generate Viva Questions":
             prompt = f"Give viva questions and answers for {topic}"
@@ -96,14 +98,8 @@ if st.button("Generate"):
         elif feature == "Generate Image Idea":
             prompt = f"Create engineering diagram description for {topic}"
 
-        elif feature == "Upload Image":
-            prompt = "Explain uploaded engineering image in detail"
-
-        elif feature == "Download PDF":
-            prompt = f"Create exam notes for {topic}"
-
         else:
-            prompt = f"Explain {topic}"
+            prompt = f"Create detailed exam notes for {topic}"
 
         # 🌐 API CALL
         response = requests.post(
@@ -122,7 +118,7 @@ if st.button("Generate"):
 
         result = response.json()
 
-        # 🧠 OUTPUT
+        # 🧠 OUTPUT SAFE
         if "choices" in result:
             output = result["choices"][0]["message"]["content"]
 
@@ -136,7 +132,7 @@ if st.button("Generate"):
                 "output": output
             })
 
-            # 📄 PDF
+            # 📄 PDF DOWNLOAD
             if feature == "Download PDF":
                 pdf_file = create_pdf(output)
                 with open(pdf_file, "rb") as f:
@@ -145,3 +141,13 @@ if st.button("Generate"):
         else:
             st.error("API Error")
             st.write(result)
+
+# ---------------- HISTORY ----------------
+st.markdown("---")
+st.subheader("📜 History")
+
+for item in reversed(st.session_state.history):
+    st.write("**Topic:**", item["topic"])
+    st.write("**Feature:**", item["feature"])
+    st.write(item["output"])
+    st.markdown("---")
