@@ -23,9 +23,6 @@ if "chat" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = "Guest"
 
-if "subject" not in st.session_state:
-    st.session_state.subject = "EEE"
-
 # ================= LOGIN =================
 def login_page():
     st.title("🔐 DERIVE META AI LOGIN")
@@ -33,174 +30,122 @@ def login_page():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    col1, col2 = st.columns(2)
-
-    with col1:
-        if st.button("Login"):
-            if username in USERS and USERS[username] == password:
-                st.session_state.logged_in = True
-                st.session_state.user = username
-                st.rerun()
-            else:
-                st.error("Invalid Credentials")
-
-    with col2:
-        if st.button("Guest Mode"):
+    if st.button("Login"):
+        if username in USERS and USERS[username] == password:
             st.session_state.logged_in = True
-            st.session_state.user = "Guest"
+            st.session_state.user = username
             st.rerun()
+        else:
+            st.error("Invalid Credentials")
 
-# ================= PDF =================
+# ================= DIAGRAM GENERATOR =================
+def generate_diagram(topic):
+
+    prompt = f"""
+    Clean engineering diagram for: {topic}
+    - labeled
+    - black and white
+    - textbook style
+    - circuit / physics schematic
+    """
+
+    encoded = urllib.parse.quote(prompt)
+
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1024&height=1024&model=flux"
+
+    return url
+
+# ================= FIXED PDF =================
 def create_pdf(question, answer, image_url=None):
 
     pdf = FPDF()
     pdf.add_page()
 
-    # Title
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(200, 10, "DERIVE META AI - REVISION BOOKLET", ln=True, align="C")
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(200, 10, "DERIVE META AI - REVISION SHEET", ln=True, align="C")
 
     pdf.ln(10)
 
-    # Question
     pdf.set_font("Arial", "B", 12)
     pdf.cell(200, 10, "QUESTION:", ln=True)
-
     pdf.set_font("Arial", size=11)
     pdf.multi_cell(0, 8, question)
 
     pdf.ln(5)
 
-    # Answer
     pdf.set_font("Arial", "B", 12)
     pdf.cell(200, 10, "ANSWER:", ln=True)
-
     pdf.set_font("Arial", size=11)
     pdf.multi_cell(0, 8, answer)
 
-    pdf.ln(5)
-
-    # Image (Diagram)
+    # IMAGE ADD
     if image_url:
-        pdf.set_font("Arial", "B", 12)
-        pdf.cell(200, 10, "DIAGRAM:", ln=True)
-
         try:
             import requests
             from io import BytesIO
 
-            img_data = requests.get(image_url).content
-            img_path = "diagram.png"
+            img = requests.get(image_url).content
+            with open("diagram.png", "wb") as f:
+                f.write(img)
 
-            with open(img_path, "wb") as f:
-                f.write(img_data)
-
-            pdf.image(img_path, x=10, w=180)
+            pdf.ln(5)
+            pdf.set_font("Arial", "B", 12)
+            pdf.cell(200, 10, "DIAGRAM:", ln=True)
+            pdf.image("diagram.png", w=180)
 
         except:
-            pdf.set_font("Arial", size=10)
-            pdf.multi_cell(0, 8, "Diagram could not be loaded")
+            pass
 
     file_path = "revision.pdf"
     pdf.output(file_path)
 
     return file_path
 
-# ================= 🔥 FIXED CIRCUIT DIAGRAM GENERATOR =================
-def generate_circuit_diagram(topic):
-
-    # VERY IMPORTANT: force strict schematic style
-    prompt = f"""
-    Clean engineering circuit diagram ONLY.
-    Topic: {topic}
-
-    Requirements:
-    - black and white schematic
-    - labeled components
-    - no artistic style
-    - textbook electrical engineering diagram
-    - simple clean lines
-    """
-
-    encoded_prompt = urllib.parse.quote(prompt)
-
-    # stable AI image generator
-    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&model=flux"
-
-    return url
-
 # ================= MAIN APP =================
 def app():
 
     st.sidebar.title(f"👤 {st.session_state.user}")
 
-    st.session_state.subject = st.sidebar.selectbox(
-        "Select Branch",
-        ["EEE", "ECE", "CSE", "MECH"]
-    )
-
-    st.sidebar.title("📜 History")
-
-    for c in reversed(st.session_state.chat):
-        st.sidebar.write("Q:", c["q"])
-        st.sidebar.write("A:", c["a"][:50])
-        st.sidebar.markdown("---")
-
-    if st.sidebar.button("Logout"):
-        st.session_state.logged_in = False
-        st.rerun()
-
-    st.title("🔥 DERIVE META AI - SMART STUDY BRAIN")
+    st.title("🔥 DERIVE META AI - FINAL STUDY BRAIN")
 
     mode = st.selectbox(
         "Choose Mode",
         [
-            "Chat Question",
+            "Chat Answer",
             "16 Mark Answer",
             "Short Notes",
-            "Derivation Steps",
-            "Circuit Diagram Generator"
+            "Amperes Law Diagram Generator"
         ]
     )
 
-    question = st.text_input("Enter Engineering Question")
+    question = st.text_input("Enter your question")
 
-    if st.button("ASK AI"):
+    if st.button("GENERATE"):
 
         if question == "":
             st.warning("Enter question")
             return
 
-        # ================= CIRCUIT MODE =================
-        if mode == "Circuit Diagram Generator":
+        # ================= DIAGRAM MODE =================
+        if mode == "Amperes Law Diagram Generator":
 
-            img_url = generate_circuit_diagram(question)
+            img_url = generate_diagram(question)
 
-            st.success("Circuit Diagram Generated 🚀")
+            st.image(img_url, caption="AI Generated Diagram 🚀")
 
-            st.image(img_url, caption="AI Generated Circuit Diagram")
+            answer = f"Diagram generated for {question}"
 
-            st.session_state.chat.append({
-                "q": question,
-                "a": "Circuit diagram generated"
-            })
+            st.session_state.chat.append({"q": question, "a": answer})
+
+            pdf_file = create_pdf(question, answer, img_url)
+
+            with open(pdf_file, "rb") as f:
+                st.download_button("Download PDF", f, file_name="notes.pdf")
 
             return
 
         # ================= TEXT AI =================
-        base = f"Subject: {st.session_state.subject}. "
-
-        if mode == "Chat Question":
-            prompt = base + f"Explain simply: {question}"
-
-        elif mode == "16 Mark Answer":
-            prompt = base + f"Write 16-mark exam answer: {question}"
-
-        elif mode == "Short Notes":
-            prompt = base + f"Give short notes: {question}"
-
-        else:
-            prompt = base + f"Step-by-step derivation: {question}"
+        prompt = f"Explain in engineering exam format: {question}"
 
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
@@ -217,24 +162,24 @@ def app():
         result = response.json()
 
         if "choices" in result:
+
             answer = result["choices"][0]["message"]["content"]
 
-            st.success("AI Generated 🚀")
+            st.success("Generated 🚀")
             st.write(answer)
 
-            st.session_state.chat.append({
-                "q": question,
-                "a": answer
-            })
+            st.session_state.chat.append({"q": question, "a": answer})
 
-            pdf_file = create_pdf(answer)
+            # FIXED PDF CALL ✅
+            pdf_file = create_pdf(question, answer)
+
             with open(pdf_file, "rb") as f:
-                st.download_button("📄 Download PDF", f, file_name="revision.pdf")
+                st.download_button("Download PDF", f, file_name="notes.pdf")
 
         else:
             st.error(result)
 
-# ================= ROUTER =================
+# ================= ROUTE =================
 if st.session_state.logged_in:
     app()
 else:
