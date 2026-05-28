@@ -2,12 +2,10 @@ import streamlit as st
 import requests
 import os
 from fpdf import FPDF
+import urllib.parse
 
 # ================= API KEYS =================
 API_KEY = os.getenv("OPENROUTER_API_KEY")
-
-# OPTIONAL (for real image generation later)
-IMAGE_KEY = os.getenv("STABILITY_API_KEY")
 
 # ================= USERS =================
 USERS = {
@@ -56,33 +54,36 @@ def login_page():
 def create_pdf(text):
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.multi_cell(0, 10, text)
+    pdf.set_font("Arial", size=11)
+    pdf.multi_cell(0, 8, text)
     file_path = "revision_booklet.pdf"
     pdf.output(file_path)
     return file_path
 
-# ================= IMAGE PROMPT (REAL DIAGRAM AI) =================
-def generate_image_prompt(text):
-    return f"""
-    Draw a clean engineering schematic / textbook diagram:
-    Topic: {text}
-    Style: black and white, labeled, circuit style, engineering textbook quality
-    """
+# ================= REAL IMAGE GENERATION =================
+def generate_diagram(topic):
+    prompt = f"engineering textbook clean circuit diagram of {topic}, labeled, black and white, simple schematic"
+
+    encoded = urllib.parse.quote(prompt)
+
+    # FREE AI IMAGE GENERATOR (NO API NEEDED)
+    image_url = f"https://image.pollinations.ai/prompt/{encoded}"
+
+    return image_url
 
 # ================= MAIN APP =================
 def app():
 
     st.sidebar.title(f"👤 {st.session_state.user}")
 
-    # SUBJECT SWITCH (MULTI DOMAIN AI)
+    # SUBJECT
     st.session_state.subject = st.sidebar.selectbox(
         "Select Branch",
         ["EEE", "ECE", "CSE", "MECH"]
     )
 
+    # HISTORY
     st.sidebar.markdown("### 📜 History")
-
     for c in reversed(st.session_state.chat):
         st.sidebar.write("Q:", c["q"])
         st.sidebar.write("A:", c["a"][:40])
@@ -94,7 +95,6 @@ def app():
 
     st.title("🔥 DERIVE META AI - SUPER STUDY BRAIN")
 
-    # ================= MODE =================
     mode = st.selectbox(
         "Choose Mode",
         [
@@ -114,64 +114,74 @@ def app():
 
         if question == "":
             st.warning("Enter question")
+            return
+
+        base = f"Subject: {st.session_state.subject}. "
+
+        # ================= IMAGE MODE =================
+        if mode == "Circuit / Diagram Generator":
+
+            img_url = generate_diagram(question)
+
+            st.success("Diagram Generated 🚀")
+            st.image(img_url, caption="AI Generated Engineering Diagram")
+
+            st.session_state.chat.append({
+                "q": question,
+                "a": "Diagram generated"
+            })
+
+            return
+
+        # ================= TEXT MODES =================
+        if mode == "Chat Question":
+            prompt = base + f"Explain like teacher: {question}"
+
+        elif mode == "16 Mark Answer":
+            prompt = base + f"Write detailed 16-mark university answer: {question}"
+
+        elif mode == "Short Notes":
+            prompt = base + f"Give short revision notes: {question}"
+
+        elif mode == "Derivation Steps":
+            prompt = base + f"Step-by-step derivation: {question}"
 
         else:
+            prompt = base + f"Create exam revision booklet: {question}"
 
-            # ========== PROMPTS ==========
-            base = f"Subject: {st.session_state.subject}. "
+        # ================= AI CALL =================
+        response = requests.post(
+            "https://openrouter.ai/api/v1/chat/completions",
+            headers={
+                "Authorization": f"Bearer {API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [{"role": "user", "content": prompt}]
+            }
+        )
 
-            if mode == "Chat Question":
-                prompt = base + f"Explain like a teacher: {question}"
+        result = response.json()
 
-            elif mode == "16 Mark Answer":
-                prompt = base + f"Write detailed 16-mark university answer: {question}"
+        if "choices" in result:
+            answer = result["choices"][0]["message"]["content"]
 
-            elif mode == "Short Notes":
-                prompt = base + f"Give short revision notes: {question}"
+            st.success("AI Generated 🚀")
+            st.write(answer)
 
-            elif mode == "Derivation Steps":
-                prompt = base + f"Step-by-step derivation: {question}"
+            st.session_state.chat.append({
+                "q": question,
+                "a": answer
+            })
 
-            elif mode == "Circuit / Diagram Generator":
-                prompt = base + generate_image_prompt(question)
+            # ================= PDF =================
+            pdf_file = create_pdf(answer)
+            with open(pdf_file, "rb") as f:
+                st.download_button("📄 Download Revision PDF", f, file_name="revision.pdf")
 
-            else:
-                prompt = base + f"Create full exam revision booklet format: {question}"
-
-            # ================= TEXT AI CALL =================
-            response = requests.post(
-                "https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {API_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": "openai/gpt-3.5-turbo",
-                    "messages": [{"role": "user", "content": prompt}]
-                }
-            )
-
-            result = response.json()
-
-            if "choices" in result:
-                answer = result["choices"][0]["message"]["content"]
-
-                st.success("AI Generated 🚀")
-                st.write(answer)
-
-                # SAVE CHAT
-                st.session_state.chat.append({
-                    "q": question,
-                    "a": answer
-                })
-
-                # ================= PDF =================
-                pdf_file = create_pdf(answer)
-                with open(pdf_file, "rb") as f:
-                    st.download_button("📄 Download Revision Booklet", f, file_name="revision.pdf")
-
-            else:
-                st.error(result)
+        else:
+            st.error(result)
 
 # ================= ROUTER =================
 if st.session_state.logged_in:
