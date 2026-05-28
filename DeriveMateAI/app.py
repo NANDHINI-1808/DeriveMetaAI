@@ -13,6 +13,16 @@ if "history" not in st.session_state:
 st.title("DERIVE META AI 🚀")
 st.subheader("AI Engineering Exam Preparation Assistant")
 
+# 📜 CHATGPT STYLE SIDEBAR HISTORY
+st.sidebar.title("📜 Chat History")
+
+if len(st.session_state.history) == 0:
+    st.sidebar.info("No history yet")
+
+for item in reversed(st.session_state.history):
+    with st.sidebar.expander(f"{item['topic']} - {item['feature']}"):
+        st.write(item["output"])
+
 # INPUT
 topic = st.text_input("Enter Engineering Topic")
 
@@ -60,10 +70,10 @@ if st.button("Generate"):
             prompt = f"Generate important viva questions and answers for {topic}."
 
         elif feature == "Generate Image":
-            prompt = f"Create a simple engineering diagram idea for {topic}"
+            prompt = f"Create a clean labeled engineering diagram explanation for {topic}. Make it simple and educational."
 
         else:
-            prompt = f"Explain {topic} in detailed notes format for PDF"
+            prompt = f"Write detailed notes for {topic} suitable for PDF download."
 
         # 🌐 API CALL
         response = requests.post(
@@ -82,12 +92,20 @@ if st.button("Generate"):
 
         result = response.json()
 
-        # 🧠 OUTPUT
+        # 🧠 OUTPUT HANDLING
         if "choices" in result:
             output = result["choices"][0]["message"]["content"]
 
             st.success("Generated Successfully 🚀")
-            st.write(output)
+
+            # 🖼️ IMAGE FEATURE
+            if feature == "Generate Image":
+                st.image(
+                    "https://source.unsplash.com/800x400/?" + topic,
+                    caption=f"AI Visual for {topic}"
+                )
+            else:
+                st.write(output)
 
             # 📜 SAVE HISTORY
             st.session_state.history.append({
@@ -105,13 +123,3 @@ if st.button("Generate"):
         else:
             st.error("Error from API")
             st.write(result)
-
-# 📜 HISTORY SECTION
-st.markdown("---")
-st.subheader("📜 History")
-
-for item in reversed(st.session_state.history):
-    st.write("**Topic:**", item["topic"])
-    st.write("**Feature:**", item["feature"])
-    st.write(item["output"])
-    st.markdown("---")
