@@ -1,13 +1,19 @@
 import streamlit as st
 import requests
 import os
+from fpdf import FPDF
 
-# 🔐 SAFE API KEY (from Streamlit / system environment)
+# 🔐 API KEY
 API_KEY = os.getenv("OPENROUTER_API_KEY")
+
+# 📜 HISTORY INIT
+if "history" not in st.session_state:
+    st.session_state.history = []
 
 st.title("DERIVE META AI 🚀")
 st.subheader("AI Engineering Exam Preparation Assistant")
 
+# INPUT
 topic = st.text_input("Enter Engineering Topic")
 
 feature = st.selectbox(
@@ -15,29 +21,49 @@ feature = st.selectbox(
     [
         "Explain Topic",
         "Generate 16 Mark Answer",
-        "Generate Viva Questions"
+        "Generate Viva Questions",
+        "Generate Image",
+        "Download PDF"
     ]
 )
+
+# 📄 PDF FUNCTION
+def create_pdf(text):
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.multi_cell(0, 10, text)
+
+    file_path = "answer.pdf"
+    pdf.output(file_path)
+    return file_path
+
 
 if st.button("Generate"):
 
     if not API_KEY:
         st.error("API Key not found. Set OPENROUTER_API_KEY in environment variables.")
-    
+
     elif topic == "":
         st.warning("Please enter a topic")
 
     else:
 
-        # 🎯 Prompt creation
+        # 🎯 PROMPT BUILD
         if feature == "Explain Topic":
             prompt = f"Explain {topic} in simple engineering student language."
 
         elif feature == "Generate 16 Mark Answer":
             prompt = f"Generate detailed 16-mark university exam answer with derivation for {topic}."
 
-        else:
+        elif feature == "Generate Viva Questions":
             prompt = f"Generate important viva questions and answers for {topic}."
+
+        elif feature == "Generate Image":
+            prompt = f"Create a simple engineering diagram idea for {topic}"
+
+        else:
+            prompt = f"Explain {topic} in detailed notes format for PDF"
 
         # 🌐 API CALL
         response = requests.post(
@@ -56,10 +82,36 @@ if st.button("Generate"):
 
         result = response.json()
 
-        # 🧠 SAFE OUTPUT
+        # 🧠 OUTPUT
         if "choices" in result:
+            output = result["choices"][0]["message"]["content"]
+
             st.success("Generated Successfully 🚀")
-            st.write(result["choices"][0]["message"]["content"])
+            st.write(output)
+
+            # 📜 SAVE HISTORY
+            st.session_state.history.append({
+                "topic": topic,
+                "feature": feature,
+                "output": output
+            })
+
+            # 📄 PDF DOWNLOAD
+            if feature == "Download PDF":
+                pdf_file = create_pdf(output)
+                with open(pdf_file, "rb") as f:
+                    st.download_button("📄 Download PDF", f, file_name="answer.pdf")
+
         else:
             st.error("Error from API")
             st.write(result)
+
+# 📜 HISTORY SECTION
+st.markdown("---")
+st.subheader("📜 History")
+
+for item in reversed(st.session_state.history):
+    st.write("**Topic:**", item["topic"])
+    st.write("**Feature:**", item["feature"])
+    st.write(item["output"])
+    st.markdown("---")
