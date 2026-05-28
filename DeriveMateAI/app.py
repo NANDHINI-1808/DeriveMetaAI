@@ -3,16 +3,19 @@ import requests
 import os
 from fpdf import FPDF
 
-# 🔐 API KEY
+# ================= API KEYS =================
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# ---------------- USERS ----------------
+# OPTIONAL (for real image generation later)
+IMAGE_KEY = os.getenv("STABILITY_API_KEY")
+
+# ================= USERS =================
 USERS = {
     "admin": "admin123",
     "student": "1234"
 }
 
-# ---------------- SESSION ----------------
+# ================= SESSION =================
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
@@ -22,9 +25,12 @@ if "chat" not in st.session_state:
 if "user" not in st.session_state:
     st.session_state.user = "Guest"
 
-# ---------------- LOGIN ----------------
+if "subject" not in st.session_state:
+    st.session_state.subject = "EEE"
+
+# ================= LOGIN =================
 def login_page():
-    st.title("🔐 DERIVE META AI LOGIN")
+    st.title("🔐 DERIVE META AI")
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -41,55 +47,69 @@ def login_page():
                 st.error("Invalid Credentials")
 
     with col2:
-        if st.button("Continue as Guest"):
+        if st.button("Guest Mode"):
             st.session_state.logged_in = True
             st.session_state.user = "Guest"
             st.rerun()
 
-# ---------------- PDF ----------------
+# ================= PDF =================
 def create_pdf(text):
     pdf = FPDF()
     pdf.add_page()
     pdf.set_font("Arial", size=12)
     pdf.multi_cell(0, 10, text)
-    file_path = "notes.pdf"
+    file_path = "revision_booklet.pdf"
     pdf.output(file_path)
     return file_path
 
-# ---------------- MAIN APP ----------------
+# ================= IMAGE PROMPT (REAL DIAGRAM AI) =================
+def generate_image_prompt(text):
+    return f"""
+    Draw a clean engineering schematic / textbook diagram:
+    Topic: {text}
+    Style: black and white, labeled, circuit style, engineering textbook quality
+    """
+
+# ================= MAIN APP =================
 def app():
 
     st.sidebar.title(f"👤 {st.session_state.user}")
 
-    # 📜 CHAT HISTORY
-    st.sidebar.title("📜 History")
+    # SUBJECT SWITCH (MULTI DOMAIN AI)
+    st.session_state.subject = st.sidebar.selectbox(
+        "Select Branch",
+        ["EEE", "ECE", "CSE", "MECH"]
+    )
+
+    st.sidebar.markdown("### 📜 History")
+
     for c in reversed(st.session_state.chat):
-        st.sidebar.write(f"Q: {c['q']}")
-        st.sidebar.write(f"A: {c['a'][:40]}...")
+        st.sidebar.write("Q:", c["q"])
+        st.sidebar.write("A:", c["a"][:40])
         st.sidebar.markdown("---")
 
     if st.sidebar.button("Logout"):
         st.session_state.logged_in = False
         st.rerun()
 
-    st.title("🔥 DERIVE META AI - STUDY SUPER BRAIN")
+    st.title("🔥 DERIVE META AI - SUPER STUDY BRAIN")
 
-    # ---------------- MODE ----------------
+    # ================= MODE =================
     mode = st.selectbox(
-        "Choose Study Mode",
+        "Choose Mode",
         [
             "Chat Question",
             "16 Mark Answer",
             "Short Notes",
             "Derivation Steps",
-            "Image Diagram Idea"
+            "Circuit / Diagram Generator",
+            "Exam Revision Booklet"
         ]
     )
 
-    # ---------------- INPUT ----------------
-    question = st.text_input("Ask your Engineering Question")
+    question = st.text_input("Ask Engineering Question")
 
-    # ---------------- GENERATE ----------------
+    # ================= GENERATE =================
     if st.button("ASK AI"):
 
         if question == "":
@@ -97,23 +117,28 @@ def app():
 
         else:
 
-            # 🎯 SMART PROMPTS
+            # ========== PROMPTS ==========
+            base = f"Subject: {st.session_state.subject}. "
+
             if mode == "Chat Question":
-                prompt = f"Explain simply like teacher: {question}"
+                prompt = base + f"Explain like a teacher: {question}"
 
             elif mode == "16 Mark Answer":
-                prompt = f"Write detailed 16-mark exam answer with headings: {question}"
+                prompt = base + f"Write detailed 16-mark university answer: {question}"
 
             elif mode == "Short Notes":
-                prompt = f"Give short revision notes: {question}"
+                prompt = base + f"Give short revision notes: {question}"
 
             elif mode == "Derivation Steps":
-                prompt = f"Explain step-by-step derivation: {question}"
+                prompt = base + f"Step-by-step derivation: {question}"
+
+            elif mode == "Circuit / Diagram Generator":
+                prompt = base + generate_image_prompt(question)
 
             else:
-                prompt = f"Give engineering diagram description for image generation: {question}"
+                prompt = base + f"Create full exam revision booklet format: {question}"
 
-            # 🌐 API CALL
+            # ================= TEXT AI CALL =================
             response = requests.post(
                 "https://openrouter.ai/api/v1/chat/completions",
                 headers={
@@ -134,21 +159,21 @@ def app():
                 st.success("AI Generated 🚀")
                 st.write(answer)
 
-                # 💾 SAVE CHAT
+                # SAVE CHAT
                 st.session_state.chat.append({
                     "q": question,
                     "a": answer
                 })
 
-                # 📄 PDF DOWNLOAD
+                # ================= PDF =================
                 pdf_file = create_pdf(answer)
                 with open(pdf_file, "rb") as f:
-                    st.download_button("📄 Download Notes PDF", f, file_name="notes.pdf")
+                    st.download_button("📄 Download Revision Booklet", f, file_name="revision.pdf")
 
             else:
                 st.error(result)
 
-# ---------------- ROUTER ----------------
+# ================= ROUTER =================
 if st.session_state.logged_in:
     app()
 else:
