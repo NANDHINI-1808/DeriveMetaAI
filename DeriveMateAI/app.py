@@ -28,7 +28,7 @@ if "subject" not in st.session_state:
 
 # ================= LOGIN =================
 def login_page():
-    st.title("🔐 DERIVE META AI")
+    st.title("🔐 DERIVE META AI LOGIN")
 
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
@@ -56,33 +56,32 @@ def create_pdf(text):
     pdf.add_page()
     pdf.set_font("Arial", size=11)
     pdf.multi_cell(0, 8, text)
-    file_path = "revision_booklet.pdf"
+    file_path = "revision.pdf"
     pdf.output(file_path)
     return file_path
 
-# ================= IMPROVED DIAGRAM ENGINE =================
-def generate_diagram(topic):
+# ================= 🔥 FIXED CIRCUIT DIAGRAM GENERATOR =================
+def generate_circuit_diagram(topic):
 
+    # VERY IMPORTANT: force strict schematic style
     prompt = f"""
-    Draw a HIGH QUALITY engineering circuit diagram.
+    Clean engineering circuit diagram ONLY.
+    Topic: {topic}
 
-    TOPIC: {topic}
-
-    RULES:
-    - Must be electrical engineering schematic
-    - Use proper symbols (loop, current, magnetic field, wire)
-    - Show direction arrows clearly
-    - Textbook style black and white
-    - Clean labeled diagram
-    - NO artistic image, only technical schematic
+    Requirements:
+    - black and white schematic
+    - labeled components
+    - no artistic style
+    - textbook electrical engineering diagram
+    - simple clean lines
     """
 
-    encoded = urllib.parse.quote(prompt)
+    encoded_prompt = urllib.parse.quote(prompt)
 
     # stable AI image generator
-    image_url = f"https://image.pollinations.ai/prompt/{encoded}"
+    url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1024&height=1024&model=flux"
 
-    return image_url
+    return url
 
 # ================= MAIN APP =================
 def app():
@@ -94,8 +93,7 @@ def app():
         ["EEE", "ECE", "CSE", "MECH"]
     )
 
-    # HISTORY
-    st.sidebar.markdown("### 📜 History")
+    st.sidebar.title("📜 History")
 
     for c in reversed(st.session_state.chat):
         st.sidebar.write("Q:", c["q"])
@@ -106,7 +104,7 @@ def app():
         st.session_state.logged_in = False
         st.rerun()
 
-    st.title("🔥 DERIVE META AI - SUPER STUDY BRAIN")
+    st.title("🔥 DERIVE META AI - SMART STUDY BRAIN")
 
     mode = st.selectbox(
         "Choose Mode",
@@ -115,50 +113,49 @@ def app():
             "16 Mark Answer",
             "Short Notes",
             "Derivation Steps",
-            "Circuit / Diagram Generator"
+            "Circuit Diagram Generator"
         ]
     )
 
-    question = st.text_input("Ask Engineering Question")
+    question = st.text_input("Enter Engineering Question")
 
-    # ================= GENERATE =================
     if st.button("ASK AI"):
 
         if question == "":
             st.warning("Enter question")
             return
 
-        # ================= DIAGRAM MODE =================
-        if mode == "Circuit / Diagram Generator":
+        # ================= CIRCUIT MODE =================
+        if mode == "Circuit Diagram Generator":
 
-            img_url = generate_diagram(question)
+            img_url = generate_circuit_diagram(question)
 
-            st.success("Diagram Generated 🚀")
-            st.image(img_url, caption="Engineering Circuit / Law Diagram")
+            st.success("Circuit Diagram Generated 🚀")
+
+            st.image(img_url, caption="AI Generated Circuit Diagram")
 
             st.session_state.chat.append({
                 "q": question,
-                "a": "Diagram generated"
+                "a": "Circuit diagram generated"
             })
 
             return
 
-        # ================= TEXT MODES =================
+        # ================= TEXT AI =================
         base = f"Subject: {st.session_state.subject}. "
 
         if mode == "Chat Question":
-            prompt = base + f"Explain like a teacher: {question}"
+            prompt = base + f"Explain simply: {question}"
 
         elif mode == "16 Mark Answer":
-            prompt = base + f"Write detailed 16-mark university answer: {question}"
+            prompt = base + f"Write 16-mark exam answer: {question}"
 
         elif mode == "Short Notes":
-            prompt = base + f"Give short revision notes: {question}"
+            prompt = base + f"Give short notes: {question}"
 
         else:
             prompt = base + f"Step-by-step derivation: {question}"
 
-        # ================= AI CALL =================
         response = requests.post(
             "https://openrouter.ai/api/v1/chat/completions",
             headers={
@@ -184,10 +181,9 @@ def app():
                 "a": answer
             })
 
-            # ================= PDF =================
             pdf_file = create_pdf(answer)
             with open(pdf_file, "rb") as f:
-                st.download_button("📄 Download Revision PDF", f, file_name="revision.pdf")
+                st.download_button("📄 Download PDF", f, file_name="revision.pdf")
 
         else:
             st.error(result)
