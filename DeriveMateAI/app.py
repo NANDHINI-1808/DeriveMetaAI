@@ -4,7 +4,7 @@ import os
 from fpdf import FPDF
 import urllib.parse
 
-# ================= API KEYS =================
+# ================= API KEY =================
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
 # ================= USERS =================
@@ -60,13 +60,26 @@ def create_pdf(text):
     pdf.output(file_path)
     return file_path
 
-# ================= REAL IMAGE GENERATION =================
+# ================= IMPROVED DIAGRAM ENGINE =================
 def generate_diagram(topic):
-    prompt = f"engineering textbook clean circuit diagram of {topic}, labeled, black and white, simple schematic"
+
+    prompt = f"""
+    Draw a HIGH QUALITY engineering circuit diagram.
+
+    TOPIC: {topic}
+
+    RULES:
+    - Must be electrical engineering schematic
+    - Use proper symbols (loop, current, magnetic field, wire)
+    - Show direction arrows clearly
+    - Textbook style black and white
+    - Clean labeled diagram
+    - NO artistic image, only technical schematic
+    """
 
     encoded = urllib.parse.quote(prompt)
 
-    # FREE AI IMAGE GENERATOR (NO API NEEDED)
+    # stable AI image generator
     image_url = f"https://image.pollinations.ai/prompt/{encoded}"
 
     return image_url
@@ -76,7 +89,6 @@ def app():
 
     st.sidebar.title(f"👤 {st.session_state.user}")
 
-    # SUBJECT
     st.session_state.subject = st.sidebar.selectbox(
         "Select Branch",
         ["EEE", "ECE", "CSE", "MECH"]
@@ -84,9 +96,10 @@ def app():
 
     # HISTORY
     st.sidebar.markdown("### 📜 History")
+
     for c in reversed(st.session_state.chat):
         st.sidebar.write("Q:", c["q"])
-        st.sidebar.write("A:", c["a"][:40])
+        st.sidebar.write("A:", c["a"][:50])
         st.sidebar.markdown("---")
 
     if st.sidebar.button("Logout"):
@@ -102,8 +115,7 @@ def app():
             "16 Mark Answer",
             "Short Notes",
             "Derivation Steps",
-            "Circuit / Diagram Generator",
-            "Exam Revision Booklet"
+            "Circuit / Diagram Generator"
         ]
     )
 
@@ -116,15 +128,13 @@ def app():
             st.warning("Enter question")
             return
 
-        base = f"Subject: {st.session_state.subject}. "
-
-        # ================= IMAGE MODE =================
+        # ================= DIAGRAM MODE =================
         if mode == "Circuit / Diagram Generator":
 
             img_url = generate_diagram(question)
 
             st.success("Diagram Generated 🚀")
-            st.image(img_url, caption="AI Generated Engineering Diagram")
+            st.image(img_url, caption="Engineering Circuit / Law Diagram")
 
             st.session_state.chat.append({
                 "q": question,
@@ -134,8 +144,10 @@ def app():
             return
 
         # ================= TEXT MODES =================
+        base = f"Subject: {st.session_state.subject}. "
+
         if mode == "Chat Question":
-            prompt = base + f"Explain like teacher: {question}"
+            prompt = base + f"Explain like a teacher: {question}"
 
         elif mode == "16 Mark Answer":
             prompt = base + f"Write detailed 16-mark university answer: {question}"
@@ -143,11 +155,8 @@ def app():
         elif mode == "Short Notes":
             prompt = base + f"Give short revision notes: {question}"
 
-        elif mode == "Derivation Steps":
-            prompt = base + f"Step-by-step derivation: {question}"
-
         else:
-            prompt = base + f"Create exam revision booklet: {question}"
+            prompt = base + f"Step-by-step derivation: {question}"
 
         # ================= AI CALL =================
         response = requests.post(
