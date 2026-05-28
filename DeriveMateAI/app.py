@@ -7,61 +7,39 @@ import streamlit.components.v1 as components
 # 🔐 API KEY
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# 📜 HISTORY
+# ---------------- USERS (SIMPLE LOGIN DB) ----------------
+USERS = {
+    "admin": "admin123",
+    "student": "1234"
+}
+
+# ---------------- SESSION ----------------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
 if "history" not in st.session_state:
     st.session_state.history = []
 
-st.set_page_config(page_title="Derive Meta AI", layout="wide")
+# ---------------- LOGIN PAGE ----------------
+def login_page():
+    st.title("🔐 DERIVE META AI LOGIN")
 
-# ---------------- SIDEBAR HISTORY ----------------
-st.sidebar.title("📜 Chat History")
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
 
-for item in reversed(st.session_state.history):
-    st.sidebar.write(f"**{item['feature']}**")
-    st.sidebar.write(item["topic"])
-    st.sidebar.markdown("---")
+    if st.button("Login"):
+        if username in USERS and USERS[username] == password:
+            st.session_state.logged_in = True
+            st.session_state.user = username
+            st.success("Login Successful 🚀")
+            st.rerun()
+        else:
+            st.error("Invalid Credentials")
 
-# ---------------- TITLE ----------------
-st.title("DERIVE META AI 🚀")
-st.subheader("AI Engineering Exam Preparation Assistant")
-
-# ---------------- INPUT ----------------
-topic = st.text_input("Enter Engineering Topic")
-
-# 🎤 VOICE INPUT (Chrome Web Speech API)
-st.subheader("🎤 Voice Input")
-
-voice_html = """
-<button onclick="startDictation()">🎤 Speak</button>
-<input id="text" style="width:100%;padding:10px;margin-top:10px;" placeholder="Voice text appears here">
-
-<script>
-function startDictation() {
-    var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
-    recognition.lang = 'en-US';
-    recognition.start();
-
-    recognition.onresult = function(event) {
-        document.getElementById('text').value =
-        event.results[0][0].transcript;
-    }
-}
-</script>
-"""
-
-components.html(voice_html, height=150)
-
-# ---------------- FEATURE ----------------
-feature = st.selectbox(
-    "Choose Feature",
-    [
-        "Explain Topic",
-        "Generate 16 Mark Answer",
-        "Generate Viva Questions",
-        "Generate Image Idea",
-        "Download PDF"
-    ]
-)
+# ---------------- LOGOUT ----------------
+def logout():
+    st.session_state.logged_in = False
+    st.rerun()
 
 # ---------------- PDF ----------------
 def create_pdf(text):
@@ -74,80 +52,130 @@ def create_pdf(text):
     pdf.output(file_path)
     return file_path
 
-# ---------------- GENERATE ----------------
-if st.button("Generate"):
+# ---------------- MAIN APP ----------------
+def app_page():
 
-    if not API_KEY:
-        st.error("API Key not found")
+    st.sidebar.title(f"👤 {st.session_state.user}")
 
-    elif topic == "":
-        st.warning("Enter topic first")
+    if st.sidebar.button("Logout"):
+        logout()
 
-    else:
+    st.sidebar.title("📜 History")
+    for item in reversed(st.session_state.history):
+        st.sidebar.write(item["feature"])
+        st.sidebar.write(item["topic"])
+        st.sidebar.markdown("---")
 
-        # 🎯 PROMPT ENGINE
-        if feature == "Explain Topic":
-            prompt = f"Explain {topic} in simple engineering language"
+    st.title("DERIVE META AI 🚀")
+    st.subheader("AI Engineering Exam Assistant")
 
-        elif feature == "Generate 16 Mark Answer":
-            prompt = f"Write detailed 16-mark university answer with derivation for {topic}"
+    # ---------------- INPUT ----------------
+    topic = st.text_input("Enter Engineering Topic")
 
-        elif feature == "Generate Viva Questions":
-            prompt = f"Give viva questions and answers for {topic}"
+    # ---------------- VOICE INPUT ----------------
+    st.subheader("🎤 Voice Input")
 
-        elif feature == "Generate Image Idea":
-            prompt = f"Create engineering diagram description for {topic}"
+    voice_html = """
+    <button onclick="startDictation()">🎤 Speak</button>
+    <input id="text" style="width:100%;padding:10px;margin-top:10px;" placeholder="Voice text appears here">
+
+    <script>
+    function startDictation() {
+        var recognition = new (window.SpeechRecognition || window.webkitSpeechRecognition)();
+        recognition.lang = 'en-US';
+        recognition.start();
+
+        recognition.onresult = function(event) {
+            document.getElementById('text').value =
+            event.results[0][0].transcript;
+        }
+    }
+    </script>
+    """
+
+    components.html(voice_html, height=150)
+
+    # ---------------- FEATURE ----------------
+    feature = st.selectbox(
+        "Choose Feature",
+        [
+            "Explain Topic",
+            "Generate 16 Mark Answer",
+            "Generate Viva Questions",
+            "Generate Image Idea",
+            "Download PDF"
+        ]
+    )
+
+    # ---------------- GENERATE ----------------
+    if st.button("Generate"):
+
+        if not API_KEY:
+            st.error("API Key not found")
+
+        elif topic == "":
+            st.warning("Enter topic")
 
         else:
-            prompt = f"Create detailed exam notes for {topic}"
 
-        # 🌐 API CALL
-        response = requests.post(
-            url="https://openrouter.ai/api/v1/chat/completions",
-            headers={
-                "Authorization": f"Bearer {API_KEY}",
-                "Content-Type": "application/json"
-            },
-            json={
-                "model": "openai/gpt-3.5-turbo",
-                "messages": [
-                    {"role": "user", "content": prompt}
-                ]
-            }
-        )
+            # 🎯 PROMPTS
+            if feature == "Explain Topic":
+                prompt = f"Explain {topic} simply"
 
-        result = response.json()
+            elif feature == "Generate 16 Mark Answer":
+                prompt = f"Write detailed 16-mark answer for {topic}"
 
-        # 🧠 OUTPUT SAFE
-        if "choices" in result:
-            output = result["choices"][0]["message"]["content"]
+            elif feature == "Generate Viva Questions":
+                prompt = f"Give viva questions for {topic}"
 
-            st.success("Generated Successfully 🚀")
-            st.write(output)
+            elif feature == "Generate Image Idea":
+                prompt = f"Create engineering diagram explanation for {topic}"
 
-            # 📜 SAVE HISTORY
-            st.session_state.history.append({
-                "topic": topic,
-                "feature": feature,
-                "output": output
-            })
+            else:
+                prompt = f"Create exam notes for {topic}"
 
-            # 📄 PDF DOWNLOAD
-            if feature == "Download PDF":
-                pdf_file = create_pdf(output)
-                with open(pdf_file, "rb") as f:
-                    st.download_button("📄 Download PDF", f, file_name="answer.pdf")
+            # 🌐 API CALL
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {API_KEY}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "openai/gpt-3.5-turbo",
+                    "messages": [
+                        {"role": "user", "content": prompt}
+                    ]
+                }
+            )
 
-        else:
-            st.error("API Error")
-            st.write(result)
+            result = response.json()
 
-# ---------------- HISTORY ----------------
-st.markdown("---")
-st.subheader("📜 History")
+            # 🧠 OUTPUT
+            if "choices" in result:
+                output = result["choices"][0]["message"]["content"]
 
-for item in reversed(st.session_state.history):
-    st.write("**Topic:**", item["topic"])
-    st.write("**Feature:**", item["feature"])
-    st.write(item["output"])
-    st.markdown("---")
+                st.success("Generated 🚀")
+                st.write(output)
+
+                # 📜 SAVE HISTORY
+                st.session_state.history.append({
+                    "topic": topic,
+                    "feature": feature,
+                    "output": output
+                })
+
+                # 📄 PDF
+                if feature == "Download PDF":
+                    pdf_file = create_pdf(output)
+                    with open(pdf_file, "rb") as f:
+                        st.download_button("Download PDF", f, file_name="answer.pdf")
+
+            else:
+                st.error(result)
+
+# ---------------- ROUTER ----------------
+if st.session_state.logged_in:
+    app_page()
+else:
+    login_page()
