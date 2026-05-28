@@ -7,7 +7,7 @@ import streamlit.components.v1 as components
 # 🔐 API KEY
 API_KEY = os.getenv("OPENROUTER_API_KEY")
 
-# ---------------- USERS (SIMPLE LOGIN DB) ----------------
+# ---------------- USERS ----------------
 USERS = {
     "admin": "admin123",
     "student": "1234"
@@ -20,6 +20,9 @@ if "logged_in" not in st.session_state:
 if "history" not in st.session_state:
     st.session_state.history = []
 
+if "user" not in st.session_state:
+    st.session_state.user = ""
+
 # ---------------- LOGIN PAGE ----------------
 def login_page():
     st.title("🔐 DERIVE META AI LOGIN")
@@ -27,14 +30,22 @@ def login_page():
     username = st.text_input("Username")
     password = st.text_input("Password", type="password")
 
-    if st.button("Login"):
-        if username in USERS and USERS[username] == password:
+    col1, col2 = st.columns(2)
+
+    with col1:
+        if st.button("Login"):
+            if username in USERS and USERS[username] == password:
+                st.session_state.logged_in = True
+                st.session_state.user = username
+                st.rerun()
+            else:
+                st.error("Invalid Credentials")
+
+    with col2:
+        if st.button("Continue as Guest"):
             st.session_state.logged_in = True
-            st.session_state.user = username
-            st.success("Login Successful 🚀")
+            st.session_state.user = "Guest"
             st.rerun()
-        else:
-            st.error("Invalid Credentials")
 
 # ---------------- LOGOUT ----------------
 def logout():
@@ -55,14 +66,17 @@ def create_pdf(text):
 # ---------------- MAIN APP ----------------
 def app_page():
 
+    st.set_page_config(page_title="Derive Meta AI", layout="wide")
+
     st.sidebar.title(f"👤 {st.session_state.user}")
 
     if st.sidebar.button("Logout"):
         logout()
 
+    # 📜 HISTORY
     st.sidebar.title("📜 History")
     for item in reversed(st.session_state.history):
-        st.sidebar.write(item["feature"])
+        st.sidebar.write(f"**{item['feature']}**")
         st.sidebar.write(item["topic"])
         st.sidebar.markdown("---")
 
@@ -120,13 +134,13 @@ def app_page():
 
             # 🎯 PROMPTS
             if feature == "Explain Topic":
-                prompt = f"Explain {topic} simply"
+                prompt = f"Explain {topic} in simple engineering language"
 
             elif feature == "Generate 16 Mark Answer":
-                prompt = f"Write detailed 16-mark answer for {topic}"
+                prompt = f"Write detailed 16-mark university answer with derivation for {topic}"
 
             elif feature == "Generate Viva Questions":
-                prompt = f"Give viva questions for {topic}"
+                prompt = f"Give viva questions and answers for {topic}"
 
             elif feature == "Generate Image Idea":
                 prompt = f"Create engineering diagram explanation for {topic}"
@@ -165,11 +179,11 @@ def app_page():
                     "output": output
                 })
 
-                # 📄 PDF
+                # 📄 PDF DOWNLOAD
                 if feature == "Download PDF":
                     pdf_file = create_pdf(output)
                     with open(pdf_file, "rb") as f:
-                        st.download_button("Download PDF", f, file_name="answer.pdf")
+                        st.download_button("📄 Download PDF", f, file_name="answer.pdf")
 
             else:
                 st.error(result)
